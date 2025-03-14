@@ -43,7 +43,7 @@ user_data = {}
 
 # /start কমান্ড
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_data[update.message.chat_id] = {"score": 0, "current_question": 0}
+    user_data[update.message.chat_id] = {"score": 0, "current_question": None}
     keyboard = [[InlineKeyboardButton("Start Exam", callback_data="start_exam")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Welcome to the Examiner Bot! Click below to start the exam.", reply_markup=reply_markup)
@@ -55,24 +55,18 @@ async def start_exam(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     chat_id = query.message.chat_id
     user_data[chat_id]["score"] = 0
-    user_data[chat_id]["current_question"] = 0
+    user_data[chat_id]["current_question"] = random.choice(list(questions.keys()))  # র্যান্ডম প্রশ্ন নির্বাচন
     await send_question(chat_id, context)
 
 # প্রশ্ন পাঠানোর ফাংশন (র্যান্ডম প্রশ্ন)
 async def send_question(chat_id, context):
     user_info = user_data[chat_id]
-    question_keys = list(questions.keys())
+    question_key = user_info["current_question"]
     
-    if user_info["current_question"] < len(question_keys):
-        # র্যান্ডম প্রশ্ন নির্বাচন
-        q_key = random.choice(question_keys)
-        q_data = questions[q_key]
-        
-        user_info["current_question"] += 1
-        await context.bot.send_message(chat_id, f"**{q_key}:** {q_data['sentence']}\n\nPlease type your answers as:\na) answer\nb) answer")
+    q_data = questions[question_key]
     
-    else:
-        await context.bot.send_message(chat_id, f"Exam finished! Your total score: {user_info['score']} / {len(questions) * 2}\n\nTo take the exam again, type /start.")
+    # প্রশ্ন পাঠান
+    await context.bot.send_message(chat_id, f"**{question_key}:** {q_data['sentence']}\n\nPlease type your answers as:\na) answer\nb) answer")
 
 # উত্তর চেক করার ফাংশন
 async def check_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -83,15 +77,8 @@ async def check_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please start the exam by typing /start.")
         return
 
-    question_keys = list(questions.keys())
-    current_question_index = user_info["current_question"]
-
-    if current_question_index >= len(question_keys):
-        await update.message.reply_text("You have completed the exam! Type /start to take it again.")
-        return
-
-    q_key = question_keys[current_question_index]
-    q_data = questions[q_key]
+    question_key = user_info["current_question"]
+    q_data = questions[question_key]
     
     user_answers = update.message.text.lower().split("\n")
     correct_count = 0
@@ -116,8 +103,8 @@ async def check_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     response = f"✔️ Correct Answers: {correct_count}\n" + "\n".join(incorrect_responses) if incorrect_responses else "✅ All Correct!"
     await update.message.reply_text(response)
 
-    # পরবর্তী প্রশ্ন পাঠানো
-    await send_question(chat_id, context)
+    # পরবর্তী প্রশ্নের জন্য আবার /start করতে হবে
+    await update.message.reply_text("To take a new question, type /start.")
 
 # বটের মেইন ফাংশন
 def main():
